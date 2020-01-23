@@ -52,14 +52,40 @@ ax.set_title('Plotting Waypoint Data')
 ##ax.set_xlim(BBox[0],BBox[1])
 ##ax.set_ylim(BBox[2],BBox[3])
 buff = max(simulationWaypoints.Longs) - min(simulationWaypoints.Longs)
+buff = 0.03
 ax.set_xlim(min(simulationWaypoints.Longs)-buff,max(simulationWaypoints.Longs)+buff)
 ax.set_ylim(min(simulationWaypoints.Lats)-buff,max(simulationWaypoints.Lats)+buff)
 ax.imshow(mapImage, zorder=0, extent = BBox)#, aspect= 'equal') # aspect doesn't seem to be working
-ax.arrow(simulationWaypoints.Longs[0], simulationWaypoints.Lats[0], buff/10, buff/10, width = 0.00005, color = 'r')
+##ax.arrow(simulationWaypoints.Longs[0], simulationWaypoints.Lats[0], buff/10, buff/10, width = 0.00005, color = 'r')
 
 # below plots those waypoints on the above map one at a time and updates
-for i in range(len(simulationWaypoints)):
-    ax.scatter(simulationWaypoints.Longs[i], simulationWaypoints.Lats[i], zorder=1, alpha= 0.8, c='k', s=10)
-    plt.pause(1)
+##for i in range(len(simulationWaypoints)):
+##    ax.scatter(simulationWaypoints.Longs[i], simulationWaypoints.Lats[i], zorder=1, alpha= 0.8, c='k', s=10)
+##    plt.pause(1)
 ##plt.show()
+
+##plt.close()
+from PBC_simulator import *
+
+##dist = 0.001 # 1 meter
+##bearing = 0 # degrees
+##for i in range(36):
+##    if i == 0:
+##        ax.scatter(simulationWaypoints.Longs[i], simulationWaypoints.Lats[i], zorder=1, alpha= 0.8, c='k', s=10)
+##
+##    new_lat_lon = newCoordFromDelta(simulationWaypoints.Lats[0], simulationWaypoints.Longs[0],dist,bearing)
+##    ax.scatter(new_lat_lon[1], new_lat_lon[0], zorder=1, alpha= 0.8, c='r', s=10)
+##    plt.pause(0.5)
+##
+##    dist += 0.010
+##    bearing += 10
+##    print(bearing)
+
+boatSim = Simulator(simulationWaypoints.Lats[0],simulationWaypoints.Longs[0])
+ax.scatter(boatSim.trueLong, boatSim.trueLat, zorder=1, alpha= 0.8, c='k', s=10)
+ax.scatter(boatSim.originLong, boatSim.originLat, zorder=1, alpha= 0.8, c='r', s=10)
+plt.show()
+
+    
+
 	
