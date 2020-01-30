@@ -5,6 +5,7 @@ float RC_in[channels];                    // an array to store the calibrated in
 
 int autoManualPin = 5;
 int waypointPin = 6;
+
 void setup() {
   pinMode(autoManualPin, INPUT);
   pinMode(waypointPin, INPUT);
