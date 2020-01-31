@@ -5,6 +5,7 @@ from queue import Queue, Empty
 from threading import Thread
 import numpy as np
 import os, sys
+import maestro
 
 # serial setups
 time.sleep(0.25)
@@ -14,6 +15,17 @@ SensorSer = serial.Serial('/dev/ttyACM0',baudrate = 115200) # consistent
 time.sleep(0.25)
 CmdSer = serial.Serial('/dev/ttyUSB1',baudrate = 115200) # varies on which is plugged first
 ##time.sleep(0.5)
+
+# maestro setup
+Steer = maestro.Controller('/dev/ttyACM1')
+maestroChannel = 6
+# servo settings, the 4x mult is due to quarter microsecs 
+microSecMin = 4*750 # -- turns boat left
+microSecMax = 4*2500 # -- turns boat right
+Steer.setRange(maestroChannel, microSecMin, microSecMax)
+Steer.setAccel(maestroChannel,254) # basically max
+Steer.setSpeed(maestroChannel,60) # close to max but slightly unkown, look in maestro code for more info
+
 
 def ScaleFxn(x, fromLow, fromHigh, toLow, toHigh):
     x = (((x - fromLow) * (toHigh - toLow)) / (fromHigh - fromLow)) + toLow
@@ -211,6 +223,8 @@ try:
             print("Steering: ",SteerCmd," Throttle: ",ThrotCmd)
             controlMsg = "s"+str(SteerCmd)+"e t"+str(ThrotCmd)+"n"
             CmdSer.write(controlMsg.encode())
+            ## update, the above now only controls the motor, steering is below            
+            Steer.setTarget(maestroChannel,int(ScaleFxn(SteerCmd,-20,20,microSecMin,microSecMax)))
 
             
             if LOGGING and not logStart:

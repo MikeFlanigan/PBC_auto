@@ -1,9 +1,9 @@
 #include <Servo.h>
 
 
-Servo myservo;
-int ServoPos = 0; // 0 - 180
-const int ServoPin = 3;
+//Servo myservo;
+//int ServoPos = 0; // 0 - 180
+//const int ServoPin = 3;
 
 bool Forward = true;
 const int motorPin = 5;
@@ -34,8 +34,8 @@ const int NEGATIVE = 45;
 void setup() {
   Serial.begin(115200);
 
-  pinMode(ServoPin, OUTPUT);
-  myservo.attach(ServoPin);
+//  pinMode(ServoPin, OUTPUT);
+//  myservo.attach(ServoPin);
 
   pinMode(motorPin, OUTPUT);
   pinMode(motorEnA, OUTPUT);
@@ -105,8 +105,8 @@ void loop() {
 //    Serial.println(Throttle);
 
     // send steering command
-    ServoPos = map(SteerAngle, -20, 20, 5, 175); // note clipped the servo limits by a couple degrees
-    myservo.write(ServoPos);
+//    ServoPos = map(SteerAngle, -20, 20, 5, 175); // note clipped the servo limits by a couple degrees
+//    myservo.write(ServoPos);
 
     // send motor command
     if (Forward) {
