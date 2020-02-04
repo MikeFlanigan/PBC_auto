@@ -3,36 +3,54 @@ unsigned long rc_update;
 const int channels = 2;                   // specify the number of receiver channels
 float RC_in[channels];                    // an array to store the calibrated input from receiver
 
-int autoManualPin = 5;
-int waypointPin = 6;
+const int autoManualPin = 5;
+const int waypointPin = 6;
+
+const int MotorEnAPin = 9;
+const int MotorEnBPin = 10;
+bool Forward = true;
 
 void setup() {
   pinMode(autoManualPin, INPUT);
   pinMode(waypointPin, INPUT);
   setup_pwmRead();
   Serial.begin(115200);
+
+  pinMode(MotorEnAPin, OUTPUT);
+  pinMode(MotorEnBPin, OUTPUT);
+
+  // send motor command
+  if (Forward) {
+    digitalWrite(MotorEnAPin, HIGH);
+    digitalWrite(MotorEnBPin, LOW);
+  }
+  else {
+    digitalWrite(MotorEnAPin, LOW);
+    digitalWrite(MotorEnBPin, HIGH);
+  }
 }
 
 void loop() {
 
   now = millis();
 
-  
+
+
 
   if (RC_avail() || now - rc_update > 25) { // if RC data is available or 25ms has passed since last update (adjust to be equal or greater than the frame rate of receiver)
 
     rc_update = now;
 
-    if (digitalRead(autoManualPin)){
+    if (digitalRead(autoManualPin)) {
       Serial.print("Aut ");
     }
     else {
       Serial.print("Man ");
     }
-    if (digitalRead(waypointPin)){
+    if (digitalRead(waypointPin)) {
       Serial.print("WpHi ");
     }
-    else{
+    else {
       Serial.print("WpLo ");
     }
 

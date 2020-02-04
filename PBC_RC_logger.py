@@ -13,19 +13,19 @@ RCSer = serial.Serial('/dev/ttyUSB0',baudrate = 115200) # varies on which is plu
 time.sleep(0.25)
 SensorSer = serial.Serial('/dev/ttyACM0',baudrate = 115200) # consistent
 time.sleep(0.25)
-CmdSer = serial.Serial('/dev/ttyUSB1',baudrate = 115200) # varies on which is plugged first
-##time.sleep(0.5)
 
 # maestro setup
-Steer = maestro.Controller('/dev/ttyACM1')
-maestroChannel = 6
+Maestro = maestro.Controller('/dev/ttyACM1')
+SteerChannel = 6
+MotorChannel = 8
 # servo settings, the 4x mult is due to quarter microsecs 
 microSecMin = 4*750 # -- turns boat left
 microSecMax = 4*2500 # -- turns boat right
-Steer.setRange(maestroChannel, microSecMin, microSecMax)
-Steer.setAccel(maestroChannel,254) # basically max
-Steer.setSpeed(maestroChannel,60) # close to max but slightly unkown, look in maestro code for more info
-
+Maestro.setRange(SteerChannel, microSecMin, microSecMax)
+Maestro.setAccel(SteerChannel,254) # basically max
+Maestro.setSpeed(SteerChannel,100) # 0-255 close to max but slightly unkown, look in maestro code for more info
+PWMlow = 0
+PWMhigh = 127
 
 def ScaleFxn(x, fromLow, fromHigh, toLow, toHigh):
     x = (((x - fromLow) * (toHigh - toLow)) / (fromHigh - fromLow)) + toLow
@@ -33,6 +33,8 @@ def ScaleFxn(x, fromLow, fromHigh, toLow, toHigh):
 
 def ListenForRCData(RCStatusQueue):
     RC_data_loc = [0, 0, 0, 0] # [AUTO, WAYPT, SteerCmd, ThrotCmd]
+    RC_data_send = [0, 0, 0, 0]
+    RC_steer_hist = [0]*10 # moving filter
     while True:
         # listen for RC data for the Ardu and send it into the queue
         rawRCdata = RCSer.readline()
@@ -51,19 +53,27 @@ def ListenForRCData(RCStatusQueue):
                 RC_data_loc[1] = 1
 
             if len(rawRCdata.split("%")) > 1:
-                RC_data_loc[2] = float(rawRCdata.split("%")[0])
-                RC_data_loc[3] = float(rawRCdata.split("%")[1])
+                RC_steer_hist.append(float(rawRCdata.split("%")[0])) # steer cmd
+                RC_steer_hist.pop(0)
+
+                RC_data_loc[2] = np.mean(RC_steer_hist)
+                RC_data_loc[3] = float(rawRCdata.split("%")[1]) # throt cmd
+
 ##                print('rc data: ',RC_data_loc)
                 RCSer.reset_input_buffer()
         except:
             print('error in rc data thread')
         
         # put in queue
-        RCStatusQueue.put(RC_data_loc)
+        if RC_data_loc != RC_data_send:
+            RC_data_send = RC_data_loc.copy()
+            RCStatusQueue.put(RC_data_send)
 
 def ListenForSensorData(GPSQueue, CompassQueue):
     GPS_data_loc = [0,0,0,0,0,0] # [fix, quality, lat, lon, spd, ang]
+    GPS_data_send = [0,0,0,0,0,0]
     Compass_data_loc = [0]
+    Compass_data_send = [0]
     while True:
         # listen for compass and gps data
         rawsensorData = SensorSer.readline()
@@ -96,8 +106,12 @@ def ListenForSensorData(GPSQueue, CompassQueue):
             pass
         
         # put in queue
-        GPSQueue.put(GPS_data_loc)
-        CompassQueue.put(Compass_data_loc)
+        if GPS_data_loc != GPS_data_send:
+            GPS_data_send = GPS_data_loc.copy()
+            GPSQueue.put(GPS_data_send)
+        if Compass_data_loc != Compass_data_send:
+            Compass_data_send = Compass_data_loc.copy()
+            CompassQueue.put(Compass_data_send)
 
 # start the listener threads
 RCStatusQueue = Queue()
@@ -113,7 +127,7 @@ SensorListenerThread.start()
 print('started SensorListenerThread thread...')
 
 
-LoopTargetTime = 60 # milliseconds
+LoopTargetTime = 1 # milliseconds
 Timer_15Hz = dt.datetime.now()
 
 over_count = 0
@@ -122,8 +136,10 @@ general_count = 0
 RC_data = []
 AUTO = False
 WAYPT = False
-SteerCmd = 0 # ~ input -100 - +100, but not actually, output -20 - 20
-ThrotCmd = 0 # ~ input -100 - +100, but not actually, output, 0 - 100
+SteerInput = 0 # ~ input -100 - +100, but not actually
+SteerCmd = 0 # output -20 - 20
+ThrotInput = 0 # ~ input -100 - +100, but not actually
+ThrotCmd = 0 # output, 0 - 100
 
 SteerCenter = 0 # will capture the center value
 ThrotBottom = 0 # will capture the center value
@@ -159,25 +175,31 @@ try:
         if (dt.datetime.now() - warm_start).seconds > warm_start_dur:
             warmingUp = False
         else:
-            print('Warm start in process, dont move controls... ',round(SteerCenter,3),round(ThrotBottom,3))
-
+##            print('Warm start in process, dont move controls... ',round(SteerCenter,3),round(ThrotBottom,3))
+            pass
+        
         # check queues for new data
-##        if RCStatusQueue.empty(): pass # could have a sleep here...
         while not RCStatusQueue.empty():
             RC_data = RCStatusQueue.get()
             # parse this into
             AUTO = RC_data[0]
             WAYPT = RC_data[1]
-            SteerCmd = RC_data[2]
-            ThrotCmd = RC_data[3]
-            # need to warm start get data from these...
-            if warmingUp:
-                if SteerCmd != 0 and ThrotCmd != 0:
-                    SteerCenter = 0.9*SteerCenter + 0.1*SteerCmd
-                    ThrotBottom = 0.9*ThrotBottom + 0.1*ThrotCmd
-            else:
-                SteerCmd = SteerCmd - SteerCenter
-                ThrotCmd = ThrotCmd - (100 + ThrotBottom)
+            SteerInput = RC_data[2]
+            ThrotInput = RC_data[3]
+##            print('rc data: ',RC_data)
+
+            
+##            # need to warm start get data from these...
+##            if warmingUp:
+##                if SteerInput != 0:
+##                    SteerCenter = 0.9*SteerCenter + 0.1*SteerInput
+##                if ThrotInput != 0:
+##                    ThrotBottom = 0.9*ThrotBottom + 0.1*ThrotInput
+##                print(SteerCenter,ThrotBottom)
+##            else:
+##                SteerCmd = SteerInput - SteerCenter
+##                ThrotCmd = ThrotInput - (100 + ThrotBottom)
+##                print(RC_data,' Steer: ',SteerCmd,' Throt: ',ThrotCmd)
                 
             if WAYPT and not DataOverflowed:
                 LOGGING = True
@@ -205,13 +227,13 @@ try:
         
         
         # 15 Hz loop for control and logging
-        if not warmingUp and (dt.datetime.now() - Timer_15Hz).microseconds >= LoopTargetTime*1000:
+        if (dt.datetime.now() - Timer_15Hz).microseconds >= LoopTargetTime*1000:
             Timer_15Hz = dt.datetime.now()
             general_count += 1
             
             # send a control command
-            SteerCmd = int(ScaleFxn(SteerCmd,-100,100,-20,20))
-            ThrotCmd = int(ScaleFxn(ThrotCmd,-100,100,0,100))
+            SteerCmd = int(ScaleFxn(SteerInput,-100,100,-20,20))
+            ThrotCmd = int(ScaleFxn(ThrotInput,-100,100,0,100))
             
             if SteerCmd > 20: SteerCmd = 20 # clipping 
             elif SteerCmd < -20: SteerCmd = -20 # clipping 
@@ -221,12 +243,14 @@ try:
             if ThrotCmd < 4: ThrotCmd = 0 # create a toleranced deadband
             
             print("Steering: ",SteerCmd," Throttle: ",ThrotCmd)
-            controlMsg = "s"+str(SteerCmd)+"e t"+str(ThrotCmd)+"n"
-            CmdSer.write(controlMsg.encode())
-            ## update, the above now only controls the motor, steering is below            
-            Steer.setTarget(maestroChannel,int(ScaleFxn(SteerCmd,-20,20,microSecMin,microSecMax)))
 
-            
+            Maestro.setTarget(SteerChannel,int(ScaleFxn(SteerCmd,-20,20,microSecMin,microSecMax)))
+
+
+            MotorSendValue = int(ScaleFxn(ThrotCmd,0,100,PWMlow,PWMhigh))
+            if MotorSendValue < 80: MotorSendValue = 0 # clip since 80 is about the lowest to get motion due to friction and start torque
+            Maestro.setPWM(MotorChannel,MotorSendValue) # 0 - 127
+        
             if LOGGING and not logStart:
                 FileName = logName + str(logIndex) +".npy"
                 # check if file exists
@@ -266,14 +290,14 @@ try:
 
 
         # warning flag if the loop takes longer then 10 milliseconds
-    ##    print((dt.datetime.now() - loop_start).microseconds)
+##        print('Loop time in microsec: ',(dt.datetime.now() - loop_start).microseconds)
         if (dt.datetime.now() - loop_start).microseconds > (LoopTargetTime+1)*1000:
 ##            print(' ')
 ##            print((dt.datetime.now() - loop_start).microseconds)
 ##            print("Warning loop time has exceeded 10 milliseconds!!")
 ##            print(' ')
             over_count += 1
-            pass
+            
 except KeyboardInterrupt:
     pass
 
@@ -282,9 +306,8 @@ except:
     e = sys.exc_info()
     print(e)
     pass
-print(general_count)
-print(over_count)
+print('Number of loops within target cycle time: ',general_count)
+print('Number of loops over target cycle time: ',over_count)
 
 RCSer.close()
 SensorSer.close()
-CmdSer.close()
