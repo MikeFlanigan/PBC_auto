@@ -116,7 +116,7 @@ while True:
         WAYPT = RC_data[1]
         SteerCmd = RC_data[2]
         ThrotCmd = RC_data[3]
-        print('rc data: ',RC_data)
+##        print('rc data: ',RC_data)
 
     while not GPSQueue.empty():
         GPS_data = GPSQueue.get()
@@ -127,13 +127,15 @@ while True:
         GPSlon = GPS_data[3]
         GPSspd = GPS_data[4]
         GPSang = GPS_data[5]
-        print(' ')
-        print('GPS data: ',GPS_data)
-        print(' ')
+##        print(' ')
+##        print('GPS data: ',GPS_data)
+##        print(' ')
 
     while not CompassQueue.empty():
         Compass_data = CompassQueue.get()
         # parse this into
-        Compass = Compass_data[0]
+        Compass = Compass_data[0] + 90
+        if Compass > 360: Compass = Compass - 360
+        print('Compass: ',Compass)
 
-    print('Loop time in microsec: ',(dt.datetime.now() - loop_start).microseconds)
+##    print('Loop time in microsec: ',(dt.datetime.now() - loop_start).microseconds)
